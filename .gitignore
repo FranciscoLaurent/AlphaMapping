@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+venv/
+.venv/
+ENV/
+.env
+backend/.env
+
+# Database
+*.sqlite3
+*.db
+data/*.db
+backend/data/
+
+# Frontend
+node_modules/
+dist/
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Logs
+*.log
+logs/
+
+# PID files (from run scripts)
+.backend.pid
+.frontend.pid
+
+# Data directory (contains database and user data)
+data/

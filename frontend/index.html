@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaMapping - 网络空间资产态势感知平台</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="map-highlight.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://fastly.jsdelivr.net/npm/echarts@4.9.0/map/js/world.js"></script>
+</head>
+
+<body>
+    <!-- Main Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- Header -->
+        <header class="dashboard-header">
+            <div class="logo-section">
+                <div class="logo-icon"><i class="fas fa-satellite-dish"></i></div>
+                <div class="logo-text">
+                    <h1>AlphaMapping</h1>
+                    <span class="subtitle">Cyberspace Asset Intelligence</span>
+                </div>
+            </div>
+
+            <div class="search-section">
+                <div class="platform-selector">
+                    <select id="platform-select">
+                        <option value="fofa">FOFA Engine</option>
+                        <option value="zoomeye">ZoomEye Engine</option>
+                    </select>
+                </div>
+                <div class="search-input-wrapper">
+                    <input type="text" id="nl-query-input" placeholder="输入自然语言查询 (例如: 北京地区的Apache服务器)">
+                    <button id="search-btn">
+                        <i class="fas fa-search"></i>
+                        <span>扫描检测</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="time-section">
+                <div id="current-time"></div>
+                <div class="status-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>系统在线</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Grid -->
+        <div class="dashboard-grid">
+            <!-- Left Panel: Statistics -->
+            <div class="left-panel">
+                <!-- Statistics Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-server"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="total-assets">0</div>
+                            <div class="stat-label">资产总数</div>
+                        </div>
+                        <div class="stat-trend">
+                            <i class="fas fa-arrow-up"></i> <span>12%</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon warning"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="high-risk">0</div>
+                            <div class="stat-label">高危资产</div>
+                        </div>
+                        <div class="stat-trend danger">
+                            <i class="fas fa-arrow-up"></i> <span>5%</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon success"><i class="fas fa-shield-alt"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="query-count">0</div>
+                            <div class="stat-label">查询次数</div>
+                        </div>
+                        <div class="stat-trend">
+                            <i class="fas fa-arrow-up"></i> <span>8%</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon primary"><i class="fas fa-globe"></i></div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="country-count">0</div>
+                            <div class="stat-label">覆盖国家</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Port Distribution Chart -->
+                <div class="chart-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-chart-pie"></i> 端口分布</h3>
+                    </div>
+                    <div class="chart-container" id="port-chart"></div>
+                </div>
+
+                <!-- Protocol Distribution -->
+                <div class="chart-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-network-wired"></i> 协议分析</h3>
+                    </div>
+                    <div class="chart-container" id="protocol-chart"></div>
+                </div>
+            </div>
+
+            <!-- Center Panel: Map & Assets -->
+            <div class="center-panel">
+                <!-- Geographic Map -->
+                <div class="map-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-map-marked-alt"></i> 全球资产分布</h3>
+                        <div class="panel-controls">
+                            <button class="btn-icon" id="analyze-btn" disabled>
+                                <i class="fas fa-brain"></i> AI分析
+                            </button>
+                        </div>
+                    </div>
+                    <div class="map-container" id="geo-map"></div>
+                </div>
+
+                <!-- Asset List -->
+                <div class="asset-list-panel">
+                    <div class="panel-header"
+                        style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <h3 style="margin: 0; font-size: 16px;"><i class="fas fa-list"></i> <span
+                                    id="query-status-text">资产列表</span></h3>
+                            <button id="view-all-btn" class="btn-secondary"
+                                style="display: none; padding: 2px 8px; font-size: 12px; border: 1px solid var(--primary); color: var(--primary); background: rgba(0,242,255,0.1); border-radius: 4px; cursor: pointer;">
+                                <i class="fas fa-undo"></i> 显示全部
+                            </button>
+                        </div>
+                        <div class="filter-controls" style="display: flex; align-items: center; gap: 8px;">
+                            <input type="text" id="asset-filter" placeholder="搜索..."
+                                style="padding: 4px 8px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 12px;">
+                            <select id="filter-country"
+                                style="padding: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 12px;">
+                                <option value="">国家</option>
+                            </select>
+                            <select id="filter-protocol"
+                                style="padding: 4px; border-radius: 4px; border: 1px solid #334155; background: #0f172a; color: #fff; font-size: 12px;">
+                                <option value="">协议</option>
+                            </select>
+                            <div class="export-dropdown" style="position: relative;">
+                                <button id="export-btn" class="btn-icon"
+                                    style="background: rgba(0,242,255,0.1); border: 1px solid var(--primary); color: var(--primary); padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                    <i class="fas fa-download"></i> 导出
+                                </button>
+                                <div id="export-menu"
+                                    style="display: none; position: absolute; right: 0; top: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 4px; z-index: 100; min-width: 100px;">
+                                    <a href="#" class="export-option" data-format="csv"
+                                        style="display: block; padding: 8px 12px; color: #fff; text-decoration: none;">CSV</a>
+                                    <a href="#" class="export-option" data-format="excel"
+                                        style="display: block; padding: 8px 12px; color: #fff; text-decoration: none;">Excel</a>
+                                    <a href="#" class="export-option" data-format="json"
+                                        style="display: block; padding: 8px 12px; color: #fff; text-decoration: none;">JSON</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="asset-list-content" id="results-container">
+                        <div class="empty-state">
+                            <i class="fas fa-satellite-dish animated-pulse"></i>
+                            <p>等待扫描任务...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Timeline & Reports -->
+            <div class="right-panel">
+                <!-- Query History Timeline -->
+                <div class="timeline-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-history"></i> 查询历史</h3>
+                        <button class="btn-icon" id="clear-history-btn" title="清除历史查询"
+                            style="font-size: 12px; padding: 5px 10px;">
+                            <i class="fas fa-trash-alt"></i> 清除
+                        </button>
+                    </div>
+                    <div class="timeline-content" id="history-container">
+                        <div class="empty-state-small">暂无历史记录</div>
+                    </div>
+                </div>
+
+                <!-- Latest Reports -->
+                <div class="reports-panel">
+                    <div class="panel-header">
+                        <h3><i class="fas fa-file-shield"></i> 安全报告</h3>
+                    </div>
+                    <div class="reports-content" id="reports-container">
+                        <div class="empty-state-small">暂无报告</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for Report Detail -->
+    <div id="report-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-file-medical-alt"></i> 安全分析报告</h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div id="report-detail-content" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Modal for Asset Detail -->
+    <div id="asset-detail-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-info-circle"></i> 资产详细信息</h2>
+                <span class="close-btn">&times;</span>
+            </div>
+            <div id="asset-detail-content" class="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Scanning Animation Overlay -->
+    <div id="scanning-overlay" class="scanning-overlay" style="display: none;">
+        <div class="scanner-box">
+            <div class="scanner-line"></div>
+            <div class="scanner-text">
+                <i class="fas fa-satellite-dish fa-spin"></i>
+                <p>正在扫描网络空间资产...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="scan-progress"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

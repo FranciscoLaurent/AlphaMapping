@@ -1,0 +1,59 @@
+# AlphaMapping Docker Compose Configuration
+# Usage: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: alphamapping-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist database and reports
+      - ./data:/app/data
+    environment:
+      # Override with your actual values or use .env file
+      - FOFA_EMAIL=${FOFA_EMAIL:-}
+      - FOFA_KEY=${FOFA_KEY:-}
+      - ZOOMEYE_KEY=${ZOOMEYE_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4}
+      - DATABASE_URL=sqlite:///./data/alphamapping.db
+      - REPORTS_DIR=/app/data/reports
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - alphamapping-net
+
+  # Frontend Web Service
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: alphamapping-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - alphamapping-net
+
+networks:
+  alphamapping-net:
+    driver: bridge
+
+volumes:
+  data:
+    driver: local
