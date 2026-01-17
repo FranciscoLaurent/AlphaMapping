@@ -8,9 +8,15 @@
 
 [中文](README.md) | English
 
-![Dashboard Preview](image.png)
+<p align="center">
+  <img src="logo.png" alt="AlphaMapping Logo" width="200" />
+</p>
 
 AlphaMapping is a next-generation cyberspace asset query and intelligent analysis system. It deeply integrates multi-platform asset mapping (FOFA, ZoomEye) with AI large language models (LLM), providing natural language interaction, real-time situational awareness dashboards, and automated security risk assessment.
+
+> 📸 **Interface Preview**: Immersive Situational Awareness Visualization Dashboard
+
+![AlphaMapping Dashboard](image.png)
 
 > 💡 **Design Philosophy: Standing on the Shoulders of Giants**
 >
@@ -28,12 +34,12 @@ AlphaMapping is a next-generation cyberspace asset query and intelligent analysi
 - **5-Column Grid Layout**: Compact asset cards displaying more information per screen
 
 ### 🤖 AI Intelligence Engine
-- **NL2CSEQL Translation**: Natural language → Platform query syntax (e.g., "Find Apache servers in Beijing")
+- **NL2CSEQL Translation**: Natural language → Platform query syntax (e.g., "Find Nginx servers in Beijing" -> [FOFA]:`city="Beijing" && product="NGINX"`)
 - **Security Risk Reports**: AI auto-analyzes asset exposure, generates risk levels, vulnerability correlations, remediation recommendations
 - **Single Asset Deep Analysis**: One-click AI security assessment for individual assets
 
 ### 📡 Multi-Source Data Fusion
-- **Dual Platform Support**: FOFA + ZoomEye out-of-the-box, extensible for more data sources
+- **Multi-Platform Support**: Currently supports FOFA and ZoomEye, with more data sources planned
 - **Smart Caching**: Same queries hit local cache first, saving API quota
 - **Data Deduplication**: IP:Port unique constraint with automatic Upsert updates
 
@@ -84,7 +90,7 @@ AlphaMapping/
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-repo/AlphaMapping.git
+git clone https://github.com/Und3r1ine/AlphaMapping.git
 cd AlphaMapping
 
 # 2. Configure API keys
