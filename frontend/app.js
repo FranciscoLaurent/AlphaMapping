@@ -776,16 +776,12 @@ function updateFilterOptions(assets) {
     const protocols = [...new Set(assets.map(a => a.protocol).filter(Boolean))];
 
     // Country dropdown — 必须转义，country 来自外部 API 不可信
-    filterCountry.innerHTML = '<option value="">国家</option>';
-    countries.forEach(c => {
-        filterCountry.innerHTML += `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`;
-    });
+    filterCountry.innerHTML = '<option value="">国家</option>' +
+        countries.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
 
     // Protocol dropdown — 同上
-    filterProtocol.innerHTML = '<option value="">协议</option>';
-    protocols.forEach(p => {
-        filterProtocol.innerHTML += `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`;
-    });
+    filterProtocol.innerHTML = '<option value="">协议</option>' +
+        protocols.map(p => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('');
 }
 
 // Apply filters

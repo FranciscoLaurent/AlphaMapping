@@ -43,10 +43,14 @@ class GeoLocationService:
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("status") == "success":
-                        lat = str(data.get("lat", ""))
-                        lon = str(data.get("lon", ""))
-                        self.cache[ip] = (lat, lon)
-                        return lat, lon
+                        raw_lat = data.get("lat")
+                        raw_lon = data.get("lon")
+                        # None / 空值不转字符串，避免存 "None" 导致 float() 崩溃
+                        if raw_lat is not None and raw_lon is not None:
+                            lat = str(raw_lat)
+                            lon = str(raw_lon)
+                            self.cache[ip] = (lat, lon)
+                            return lat, lon
                         
         except Exception as e:
             logger.warning(f"Failed to get geolocation for {ip}: {e}")

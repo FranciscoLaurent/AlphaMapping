@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from .core.config import settings
 from .models.models import Base, PlatformQuery, Asset, SecurityReport
 from .models.scheduled_task import ScheduledTask
@@ -133,45 +134,46 @@ async def query_assets(request: QueryRequest, db: Session = Depends(get_db)):
         results_count=len(results)
     )
     db.add(new_query)
-    db.commit()
+    db.flush()  # 分配 ID 但不提交，等资产一起提交，避免资产写入失败时产生孤儿记录
     db.refresh(new_query)
 
     updated_count = 0
     created_count = 0
-    
+
     for item in results:
         ip = item.get('ip')
         port = item.get('port')
-        
+
         if not ip or not port:
             continue  # Skip invalid entries
-        
+
         lat, lon = coords.get(ip, (None, None)) if ip else (None, None)
-        
+
         # Check if asset already exists
         existing_asset = db.query(Asset).filter(
             Asset.ip == ip,
             Asset.port == port
         ).first()
-        
+
         if existing_asset:
             # Update existing asset with new data
             for key, value in item.items():
                 if hasattr(existing_asset, key) and value is not None:
                     setattr(existing_asset, key, value)
-            
+
             existing_asset.last_seen = datetime.datetime.utcnow()
             existing_asset.platform = request.platform
             existing_asset.raw_data = item
-            
+
             # Update geolocation if we have new coordinates
             if lat and lon:
                 existing_asset.latitude = lat
                 existing_asset.longitude = lon
-                
+
             updated_count += 1
         else:
-            # Create new asset
+            # Create new asset — 逐条 flush + 捕获 IntegrityError，
+            # 避免并发插入同一 ip:port 时整批回滚丢失所有资产
             asset = Asset(
                 **item,
                 platform=request.platform,
@@ -181,8 +183,27 @@ async def query_assets(request: QueryRequest, db: Session = Depends(get_db)):
                 longitude=lon
             )
             db.add(asset)
-            created_count += 1
-    
+            try:
+                db.flush()
+                created_count += 1
+            except IntegrityError:
+                db.rollback()
+                # 并发插入了同一 ip:port，改为更新
+                existing_asset = db.query(Asset).filter(
+                    Asset.ip == ip, Asset.port == port
+                ).first()
+                if existing_asset:
+                    for key, value in item.items():
+                        if hasattr(existing_asset, key) and value is not None:
+                            setattr(existing_asset, key, value)
+                    existing_asset.last_seen = datetime.datetime.utcnow()
+                    existing_asset.platform = request.platform
+                    existing_asset.raw_data = item
+                    if lat and lon:
+                        existing_asset.latitude = lat
+                        existing_asset.longitude = lon
+                    updated_count += 1
+
     db.commit()
     
     logger.info(f"Created {created_count} new assets, updated {updated_count} existing assets")
@@ -275,6 +296,7 @@ def clear_history(db: Session = Depends(get_db)):
 @app.get("/assets/recent")
 def get_recent_assets(limit: int = 100, db: Session = Depends(get_db)):
     """Get the most recent assets added to the database."""
+    limit = min(max(limit, 1), 500)  # 防止 limit=999999999 把全表加载到内存
     assets = db.query(Asset).order_by(Asset.id.desc()).limit(limit).all()
     
     return [
@@ -417,7 +439,7 @@ def export_assets(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     else:
-        raise HTTPException(status_code=400, detail=f"Unsupported format: {format}")
+        raise HTTPException(status_code=400, detail="不支持的导出格式，请使用 csv、excel 或 json")
 
 @app.get("/asset/{asset_id}")
 def get_asset_detail(asset_id: int, db: Session = Depends(get_db)):
@@ -491,23 +513,27 @@ def get_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
             "country_distribution": {}
         }
 
-    # Geographic distribution — 用 SQL 过滤，避免全表加载到内存
+    # Geographic distribution — 用 SQL 过滤 + 限制返回量，避免全表加载到内存
     geo_rows = db.query(
         Asset.country, Asset.city, Asset.ip,
         Asset.longitude, Asset.latitude
     ).filter(
-        Asset.latitude.isnot(None), Asset.longitude.isnot(None)
-    ).all()
+        Asset.latitude.isnot(None), Asset.longitude.isnot(None),
+        Asset.latitude != '', Asset.longitude != ''  # 排除空字符串
+    ).limit(2000).all()
 
-    geo_data = [
-        {
-            "name": r.country or "Unknown",
-            "value": [float(r.longitude), float(r.latitude), 1],
-            "ip": r.ip,
-            "city": r.city
-        }
-        for r in geo_rows
-    ]
+    geo_data = []
+    for r in geo_rows:
+        try:
+            geo_data.append({
+                "name": r.country or "Unknown",
+                "value": [float(r.longitude), float(r.latitude), 1],
+                "ip": r.ip,
+                "city": r.city
+            })
+        except (ValueError, TypeError):
+            # 跳过无法转为浮点数的脏数据
+            continue
 
     # Port distribution
     port_stats = db.query(

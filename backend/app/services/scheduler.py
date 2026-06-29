@@ -236,13 +236,14 @@ async def execute_scheduled_query(task_id: int, db_session_factory):
         logger.info(f"Task {task_id} completed: {task.last_result}")
         
     except Exception as e:
-        logger.error(f"Task {task_id} failed: {e}")
-        # Update task with error
+        logger.error("Task %s failed: %s", task_id, e)
+        # 更新任务状态，但不把原始异常写入 DB（会通过 /scheduled-tasks 暴露到客户端）
         task = db.query(ScheduledTask).filter(ScheduledTask.id == task_id).first()
         if task:
+            db.rollback()  # 确保 session 干净再写入
             task.last_run = datetime.utcnow()
             task.run_count += 1
-            task.last_result = f"Error: {str(e)}"
+            task.last_result = "Error: 查询执行失败，请检查日志"
             db.commit()
     finally:
         db.close()
