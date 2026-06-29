@@ -388,7 +388,7 @@ function showAssetDetail(index) {
         </div>
         
         <div class="detail-field" style="grid-column: 1 / -1; margin-bottom: 20px;">
-            <button onclick="triggerAssetAnalysis(${asset.id})" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <button onclick="triggerAssetAnalysis(${Number.isSafeInteger(Number(asset.id)) ? asset.id : 0})" class="btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
                 <i class="fas fa-brain"></i> AI 安全分析 (单资产)
             </button>
             <div id="asset-analysis-result" style="margin-top: 15px; display: none;"></div>
@@ -546,10 +546,10 @@ async function loadReports() {
                     <strong>${escapeHtml(r.risk_level)} Risk</strong>: ${summary}...
                 </div>
                 <div class="download-buttons" style="margin-top: 5px; display: flex; gap: 5px;">
-                    <button class="btn-download" onclick="event.stopPropagation(); downloadReport(${r.id}, 'markdown')" title="下载 Markdown">
+                    <button class="btn-download" onclick="event.stopPropagation(); downloadReport(${Number.isSafeInteger(Number(r.id)) ? r.id : 0}, 'markdown')" title="下载 Markdown">
                         <i class="fas fa-file-alt"></i> MD
                     </button>
-                    <button class="btn-download" onclick="event.stopPropagation(); downloadReport(${r.id}, 'pdf')" title="下载 PDF">
+                    <button class="btn-download" onclick="event.stopPropagation(); downloadReport(${Number.isSafeInteger(Number(r.id)) ? r.id : 0}, 'pdf')" title="下载 PDF">
                         <i class="fas fa-file-pdf"></i> PDF
                     </button>
                 </div>
@@ -606,7 +606,7 @@ function formatMarkdown(text) {
         .replace(/### (.*)/g, '<h3 style="color:var(--primary); margin:15px 0;">$1</h3>')
         .replace(/## (.*)/g, '<h2 style="color:var(--primary); margin:20px 0;">$1</h2>')
         .replace(/# (.*)/g, '<h1 style="color:var(--primary); margin:25px 0;">$1</h1>')
-        .replace(/\*\*(.*)\*\*/g, '<strong style="color:var(--secondary)">$1</strong>');
+        .replace(/\*\*(.*?)\*\*/g, '<strong style="color:var(--secondary)">$1</strong>');
 }
 
 function rerunQuery(nl, platform) {
@@ -775,16 +775,16 @@ function updateFilterOptions(assets) {
     const countries = [...new Set(assets.map(a => a.country).filter(Boolean))];
     const protocols = [...new Set(assets.map(a => a.protocol).filter(Boolean))];
 
-    // Country dropdown
+    // Country dropdown — 必须转义，country 来自外部 API 不可信
     filterCountry.innerHTML = '<option value="">国家</option>';
     countries.forEach(c => {
-        filterCountry.innerHTML += `<option value="${c}">${c}</option>`;
+        filterCountry.innerHTML += `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`;
     });
 
-    // Protocol dropdown
+    // Protocol dropdown — 同上
     filterProtocol.innerHTML = '<option value="">协议</option>';
     protocols.forEach(p => {
-        filterProtocol.innerHTML += `<option value="${p}">${p}</option>`;
+        filterProtocol.innerHTML += `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`;
     });
 }
 

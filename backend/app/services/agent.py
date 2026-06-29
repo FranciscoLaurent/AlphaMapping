@@ -60,9 +60,9 @@ class AgentService:
             return query
             
         except Exception as e:
-            logger.error(f"Error formulating CSEQL: {e}")
-            # Fallback for simple cases if LLM fails
-            return f'"{nl_query}"'
+            logger.error("Error formulating CSEQL: %s", e)
+            # LLM 不可用时直接抛异常，避免把用户原始输入当查询发给外部平台烧额度
+            raise Exception(f"CSEQL 翻译失败: {e}")
 
     def generate_security_report(self, assets: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
@@ -128,11 +128,11 @@ class AgentService:
                 "content": content if 'content' in locals() else "Error generating report."
             }
         except Exception as e:
-            logger.error(f"Error generating security report: {e}")
+            logger.error("Error generating security report: %s", e)
             return {
-                "summary": "Automated analysis failed due to service error.",
+                "summary": "自动化分析服务暂时不可用。",
                 "risk_level": "Unknown",
-                "content": f"## Analysis Error\n\nAn error occurred while communicating with the AI analysis engine: {str(e)}"
+                "content": "## 分析错误\n\n与 AI 分析引擎通信时发生错误，请稍后重试。"
             }
 
     def analyze_single_asset(self, asset: dict) -> dict:
@@ -198,5 +198,5 @@ class AgentService:
             return analysis
             
         except Exception as e:
-            logger.error(f"Failed to analyze asset: {e}")
-            raise Exception(f"Failed to analyze asset: {str(e)}")
+            logger.error("Failed to analyze asset: %s", e)
+            raise Exception("资产分析失败，请稍后重试")

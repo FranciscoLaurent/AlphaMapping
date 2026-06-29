@@ -13,8 +13,8 @@ from .services.agent import AgentService
 from .services.geolocation import GeoLocationService
 from .services.report_generator import ReportGenerator
 from .services.scheduler import scheduler_service, execute_scheduled_query
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
+from typing import List, Literal, Optional, Dict, Any
 import datetime
 import logging
 from pathlib import Path
@@ -31,14 +31,14 @@ app = FastAPI(title=settings.APP_NAME)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,  # True + origins=["*"] = 任意网站可携带凭证发请求（会话劫持）
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 class QueryRequest(BaseModel):
     nl_query: str
-    platform: str # 'fofa' or 'zoomeye'
+    platform: Literal['fofa', 'zoomeye'] = Field(..., description="查询平台")
     use_cache: bool = True
 
 @app.get("/")
@@ -74,7 +74,8 @@ async def query_assets(request: QueryRequest, db: Session = Depends(get_db)):
     try:
         query_string = agent.translate_nl_to_cseql(request.nl_query, request.platform)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"LLM translation failed: {str(e)}")
+        logger.error("LLM translation failed: %s", e)
+        raise HTTPException(status_code=500, detail="查询翻译失败，请稍后重试")
 
     # 2. Check Cache
     cached_query = db.query(PlatformQuery).filter(
@@ -116,7 +117,8 @@ async def query_assets(request: QueryRequest, db: Session = Depends(get_db)):
     try:
         results = await platform_svc.query(query_string)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Platform query failed: %s", e)
+        raise HTTPException(status_code=502, detail="平台查询失败，请检查查询条件或稍后重试")
 
     # 4. Get geolocation for new assets
     geo_service = GeoLocationService()
@@ -267,8 +269,8 @@ def clear_history(db: Session = Depends(get_db)):
         }
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to clear history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to clear history: %s", e)
+        raise HTTPException(status_code=500, detail="清除历史记录失败")
 
 @app.get("/assets/recent")
 def get_recent_assets(limit: int = 100, db: Session = Depends(get_db)):
@@ -398,21 +400,21 @@ def export_assets(
         return Response(
             content=content,
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     elif format == "excel":
         content = AssetExporter.to_excel(assets)
         return Response(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     elif format == "json":
         content = AssetExporter.to_json(assets)
         return Response(
             content=content,
             media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {format}")
@@ -471,17 +473,16 @@ async def analyze_asset(asset_id: int, db: Session = Depends(get_db)):
         logger.info(f"Analyzed asset {asset_id}: {analysis.get('risk_level', 'Unknown')}")
         return analysis
     except Exception as e:
-        logger.error(f"Failed to analyze asset {asset_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Failed to analyze asset %s: %s", asset_id, e)
+        raise HTTPException(status_code=500, detail="资产分析失败，请稍后重试")
 
 @app.get("/stats")
 def get_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get aggregated statistics for visualization."""
-    
-    # Get all assets
-    assets = db.query(Asset).all()
-    
-    if not assets:
+
+    total_assets = db.query(func.count(Asset.id)).scalar() or 0
+
+    if total_assets == 0:
         return {
             "total_assets": 0,
             "geo_distribution": [],
@@ -489,38 +490,45 @@ def get_stats(db: Session = Depends(get_db)) -> Dict[str, Any]:
             "protocol_distribution": {},
             "country_distribution": {}
         }
-    
-    # Geographic distribution (for map)
-    geo_data = []
-    for asset in assets:
-        if asset.latitude and asset.longitude:
-            geo_data.append({
-                "name": asset.country or "Unknown",
-                "value": [float(asset.longitude), float(asset.latitude), 1],
-                "ip": asset.ip,
-                "city": asset.city
-            })
-    
+
+    # Geographic distribution — 用 SQL 过滤，避免全表加载到内存
+    geo_rows = db.query(
+        Asset.country, Asset.city, Asset.ip,
+        Asset.longitude, Asset.latitude
+    ).filter(
+        Asset.latitude.isnot(None), Asset.longitude.isnot(None)
+    ).all()
+
+    geo_data = [
+        {
+            "name": r.country or "Unknown",
+            "value": [float(r.longitude), float(r.latitude), 1],
+            "ip": r.ip,
+            "city": r.city
+        }
+        for r in geo_rows
+    ]
+
     # Port distribution
     port_stats = db.query(
         Asset.port, func.count(Asset.id)
     ).group_by(Asset.port).order_by(func.count(Asset.id).desc()).limit(10).all()
     port_distribution = {str(port): count for port, count in port_stats if port}
-    
+
     # Protocol distribution
     protocol_stats = db.query(
         Asset.protocol, func.count(Asset.id)
     ).group_by(Asset.protocol).all()
     protocol_distribution = {proto or "unknown": count for proto, count in protocol_stats}
-    
+
     # Country distribution
     country_stats = db.query(
         Asset.country, func.count(Asset.id)
     ).group_by(Asset.country).order_by(func.count(Asset.id).desc()).limit(10).all()
     country_distribution = {country or "Unknown": count for country, count in country_stats}
-    
+
     return {
-        "total_assets": len(assets),
+        "total_assets": total_assets,
         "geo_distribution": geo_data,
         "port_distribution": port_distribution,
         "protocol_distribution": protocol_distribution,
@@ -560,21 +568,21 @@ def download_report(report_id: int, format: str = "markdown", db: Session = Depe
                 media_type="text/markdown"
             )
     except Exception as e:
-        logger.error(f"Error downloading report: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to generate report file: {str(e)}")
+        logger.error("Error downloading report: %s", e)
+        raise HTTPException(status_code=500, detail="报告文件生成失败")
 
 # ============ Scheduled Tasks API ============
 
 class ScheduledTaskCreate(BaseModel):
     name: str
     nl_query: str
-    platform: str  # fofa or zoomeye
+    platform: Literal['fofa', 'zoomeye']
     cron_expression: str  # e.g., "0 2 * * *" for 2am daily
 
 class ScheduledTaskUpdate(BaseModel):
     name: Optional[str] = None
     nl_query: Optional[str] = None
-    platform: Optional[str] = None
+    platform: Optional[Literal['fofa', 'zoomeye']] = None
     cron_expression: Optional[str] = None
     is_active: Optional[bool] = None
 
