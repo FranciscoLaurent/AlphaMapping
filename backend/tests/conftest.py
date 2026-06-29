@@ -109,3 +109,51 @@ def mock_geolocation_response():
         "lat": 39.9042,
         "lon": 116.4074
     }
+
+
+@pytest.fixture
+def mock_zoomeye_response():
+    """Mock ZoomEye API response with a single page of matches."""
+    def _match(ip: str, port: int) -> dict:
+        return {
+            "ip": ip,
+            "portinfo": {
+                "port": port,
+                "service": "http",
+                "hostname": f"host{port}.example.com",
+                "title": f"Title {port}",
+                "server": "nginx"
+            },
+            "geoinfo": {
+                "country": {"names": {"en": "China"}},
+                "city": {"names": {"en": "Beijing"}},
+                "organization": "Example Org"
+            }
+        }
+
+    return {
+        "matches": [_match("192.168.1.10", 80), _match("192.168.1.11", 443)],
+        "total": 2,
+    }
+
+
+@pytest.fixture
+def mock_zoomeye_large_response():
+    """Mock ZoomEye API response with many matches (used to test size limit)."""
+    matches = []
+    for i in range(25):
+        matches.append({
+            "ip": f"10.0.0.{i}",
+            "portinfo": {"port": 80, "service": "http"},
+            "geoinfo": {"country": {"names": {"en": "CN"}}}
+        })
+    return {"matches": matches, "total": 25}
+
+
+@pytest.fixture
+def mock_fofa_error_response():
+    """Mock FOFA API error response (non-200 + error body)."""
+    return {
+        "error": True,
+        "errmsg": "Invalid query syntax"
+    }

@@ -1,5 +1,9 @@
 const API_BASE = 'http://localhost:8000';
 
+// 转义与风险判定工具（来自 lib/sanitize.js、lib/risk.js）
+const { escapeHtml, escapeAttr } = window.AlphaSanitize || {};
+const { countHighRiskAssets } = window.AlphaRisk || {};
+
 // State
 let currentResults = [];
 let originalResults = []; // Store full dataset for filtering
@@ -190,14 +194,14 @@ async function updateUI(results, updateCharts = true) {
         return `
         <div class="asset-card" onclick="showAssetDetail(${idx})" data-asset-index="${idx}">
             <div class="card-row">
-                <span class="ip-address">${asset.ip}</span>
-                <span class="port-badge">${asset.port}</span>
+                <span class="ip-address">${escapeHtml(asset.ip)}</span>
+                <span class="port-badge">${escapeHtml(asset.port)}</span>
             </div>
-            <div class="asset-title" title="${displayTitle}">${displayTitle}</div>
+            <div class="asset-title" title="${escapeAttr(displayTitle)}">${escapeHtml(displayTitle)}</div>
             <div class="asset-meta">
-                <div class="meta-item" title="Location"><i class="fas fa-globe"></i> ${displayLocation}</div>
-                <div class="meta-item" title="Server"><i class="fas fa-server"></i> ${displayServer}</div>
-                <div class="meta-item" title="Organization"><i class="fas fa-building"></i> ${displayOrg}</div>
+                <div class="meta-item" title="Location"><i class="fas fa-globe"></i> ${escapeHtml(displayLocation)}</div>
+                <div class="meta-item" title="Server"><i class="fas fa-server"></i> ${escapeHtml(displayServer)}</div>
+                <div class="meta-item" title="Organization"><i class="fas fa-building"></i> ${escapeHtml(displayOrg)}</div>
             </div>
         </div>
         `;
@@ -205,12 +209,11 @@ async function updateUI(results, updateCharts = true) {
 
     // 2. Update Stats
     dom.stats.total.innerText = results.length;
-    dom.stats.highRisk.innerText = Math.floor(results.length * (Math.random() * 0.2)); // Simulating risk detection
+    // 高危资产：基于暴露的敏感端口（SSH/RDP/数据库等）真实统计，取代原 Math.random() 假数据
+    dom.stats.highRisk.innerText = countHighRiskAssets ? countHighRiskAssets(results) : 0;
     const uniqueCountries = new Set(results.map(r => r.country)).size;
     dom.stats.countries.innerText = uniqueCountries;
 
-    // 3. Update Charts and Map
-    updateCharts(results);
     // 3. Update Charts and Map
     updateCharts(results);
     // Map update is handled by global stats or specific filter logic
@@ -288,8 +291,8 @@ async function initDashboard() {
                     },
                     tooltip: {
                         formatter: function (params) {
-                            return `${params.data.ip}<br/>
-                                    ${params.data.city || 'Unknown'}, ${params.data.name}<br/>
+                            return `${escapeHtml(params.data.ip)}<br/>
+                                    ${escapeHtml(params.data.city || 'Unknown')}, ${escapeHtml(params.data.name)}<br/>
                                     经纬度: ${params.value[0].toFixed(2)}, ${params.value[1].toFixed(2)}<br/>
                                     <span style="color: #ffa500;">💡 点击查看资产详情</span>`;
                         }
@@ -373,15 +376,15 @@ function showAssetDetail(index) {
 
     detailContent.innerHTML = `
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
-            <div class="detail-field"><label>IP 地址</label><div>${asset.ip || 'N/A'}</div></div>
-            <div class="detail-field"><label>端口</label><div>${asset.port || 'N/A'}</div></div>
-            <div class="detail-field"><label>协议</label><div>${asset.protocol || 'N/A'}</div></div>
-            <div class="detail-field"><label>国家</label><div>${asset.country || 'N/A'}</div></div>
-            <div class="detail-field"><label>城市</label><div>${asset.city || 'N/A'}</div></div>
-            <div class="detail-field"><label>服务器</label><div>${asset.server || 'N/A'}</div></div>
-            <div class="detail-field" style="grid-column: 1 / -1;"><label>标题</label><div>${asset.title || 'N/A'}</div></div>
-            <div class="detail-field" style="grid-column: 1 / -1;"><label>域名/主机</label><div>${asset.domain || asset.host || 'N/A'}</div></div>
-            <div class="detail-field" style="grid-column: 1 / -1;"><label>组织机构</label><div>${asset.org || 'N/A'}</div></div>
+            <div class="detail-field"><label>IP 地址</label><div>${escapeHtml(asset.ip || 'N/A')}</div></div>
+            <div class="detail-field"><label>端口</label><div>${escapeHtml(asset.port || 'N/A')}</div></div>
+            <div class="detail-field"><label>协议</label><div>${escapeHtml(asset.protocol || 'N/A')}</div></div>
+            <div class="detail-field"><label>国家</label><div>${escapeHtml(asset.country || 'N/A')}</div></div>
+            <div class="detail-field"><label>城市</label><div>${escapeHtml(asset.city || 'N/A')}</div></div>
+            <div class="detail-field"><label>服务器</label><div>${escapeHtml(asset.server || 'N/A')}</div></div>
+            <div class="detail-field" style="grid-column: 1 / -1;"><label>标题</label><div>${escapeHtml(asset.title || 'N/A')}</div></div>
+            <div class="detail-field" style="grid-column: 1 / -1;"><label>域名/主机</label><div>${escapeHtml(asset.domain || asset.host || 'N/A')}</div></div>
+            <div class="detail-field" style="grid-column: 1 / -1;"><label>组织机构</label><div>${escapeHtml(asset.org || 'N/A')}</div></div>
         </div>
         
         <div class="detail-field" style="grid-column: 1 / -1; margin-bottom: 20px;">
@@ -393,7 +396,7 @@ function showAssetDetail(index) {
         
         <div class="detail-field" style="grid-column: 1 / -1;">
             <label>原始数据 (Raw JSON)</label>
-            <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow: auto; max-height: 200px; color: #a5b4fc; font-family: monospace; font-size: 11px;">${rawDataJson}</pre>
+            <pre style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 4px; overflow: auto; max-height: 200px; color: #a5b4fc; font-family: monospace; font-size: 11px;">${escapeHtml(rawDataJson)}</pre>
         </div>
     `;
 
@@ -419,38 +422,41 @@ async function triggerAssetAnalysis(assetId) {
             if (data.risk_level === 'High') riskColor = '#ef4444';
             if (data.risk_level === 'Medium') riskColor = '#f59e0b';
 
+            const vulnList = (data.vulnerabilities || []).map(v => `<li>${escapeHtml(v)}</li>`).join('') || '<li>未发现明显漏洞</li>';
+            const recList = (data.recommendations || []).map(r => `<li>${escapeHtml(r)}</li>`).join('') || '<li>暂无建议</li>';
+
             resultDiv.innerHTML = `
                 <div style="background: rgba(30, 41, 59, 0.8); border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; animation: slideDown 0.3s ease;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 10px;">
                         <h3 style="margin: 0; color: var(--text-primary); font-size: 16px;"><i class="fas fa-shield-alt"></i> 分析结果</h3>
-                        <span style="background: ${riskColor}; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">${data.risk_level} Risk</span>
+                        <span style="background: ${riskColor}; color: white; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: bold;">${escapeHtml(data.risk_level)} Risk</span>
                     </div>
-                    
+
                     <div style="margin-bottom: 15px; color: #cbd5e1; font-size: 14px; line-height: 1.5;">
-                        ${data.summary || '无摘要信息'}
+                        ${escapeHtml(data.summary || '无摘要信息')}
                     </div>
-                    
+
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                         <div>
                             <strong style="color: #f87171; font-size: 13px; display: block; margin-bottom: 5px;"><i class="fas fa-exclamation-triangle"></i> 潜在漏洞</strong>
                             <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); font-size: 13px;">
-                                ${(data.vulnerabilities || []).map(v => `<li>${v}</li>`).join('') || '<li>未发现明显漏洞</li>'}
+                                ${vulnList}
                             </ul>
                         </div>
                         <div>
                             <strong style="color: #4ade80; font-size: 13px; display: block; margin-bottom: 5px;"><i class="fas fa-check-circle"></i> 安全建议</strong>
                             <ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); font-size: 13px;">
-                                ${(data.recommendations || []).map(r => `<li>${r}</li>`).join('') || '<li>暂无建议</li>'}
+                                ${recList}
                             </ul>
                         </div>
                     </div>
                 </div>
             `;
         } else {
-            resultDiv.innerHTML = `<div style="color: #ef4444; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 4px;">分析失败: ${data.detail}</div>`;
+            resultDiv.innerHTML = `<div style="color: #ef4444; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 4px;">分析失败: ${escapeHtml(data.detail)}</div>`;
         }
     } catch (e) {
-        resultDiv.innerHTML = `<div style="color: #ef4444; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 4px;">系统错误: ${e.message}</div>`;
+        resultDiv.innerHTML = `<div style="color: #ef4444; padding: 10px; background: rgba(239,68,68,0.1); border-radius: 4px;">系统错误: ${escapeHtml(e.message)}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = originalText;
@@ -486,6 +492,10 @@ dom.analyzeBtn.addEventListener('click', async () => {
 });
 
 // History & Report Loaders
+// 缓存历史/报告原始数据，避免把不可信字符串拼进 onclick 的 JS 字面量（XSS 注入点）
+let historyCache = [];
+let reportsCache = [];
+
 async function loadHistory() {
     try {
         const resp = await fetch(`${API_BASE}/queries`);
@@ -496,15 +506,24 @@ async function loadHistory() {
 
         dom.stats.queryCount.innerText = queries.length;
 
-        container.innerHTML = queries.reverse().map(q => `
-            <div class="history-item" onclick="rerunQuery('${q.nl_query}', '${q.platform}')">
-                <div class="item-time">${new Date(q.created_at).toLocaleString()}</div>
+        // 反转后缓存，渲染时只传索引，查询文本不进 HTML 属性 / JS 字面量
+        historyCache = queries.slice().reverse();
+        container.innerHTML = historyCache.map((q, idx) => `
+            <div class="history-item" onclick="rerunQueryFromHistory(${idx})">
+                <div class="item-time">${escapeHtml(new Date(q.created_at).toLocaleString())}</div>
                 <div class="item-text">
-                    <span style="color:var(--primary)">[${q.platform}]</span> ${q.nl_query}
+                    <span style="color:var(--primary)">[${escapeHtml(q.platform)}]</span> ${escapeHtml(q.nl_query)}
                 </div>
             </div>
         `).join('');
     } catch (e) { console.error(e); }
+}
+
+// 从缓存按索引重跑查询，避免 nl_query 进入 HTML/JS 字符串上下文
+function rerunQueryFromHistory(idx) {
+    const q = historyCache[idx];
+    if (!q) return;
+    rerunQuery(q.nl_query, q.platform);
 }
 
 async function loadReports() {
@@ -515,11 +534,16 @@ async function loadReports() {
         const container = document.getElementById('reports-container');
         if (reports.length === 0) return;
 
-        container.innerHTML = reports.reverse().map(r => `
-            <div class="report-item ${r.risk_level.toLowerCase()}">
-                <div class="item-time">${new Date(r.created_at).toLocaleString()}</div>
-                <div class="item-text" onclick='showReportDetails(${JSON.stringify(r).replace(/'/g, "&apos;")})' style="cursor: pointer;">
-                    <strong>${r.risk_level} Risk</strong>: ${r.summary.substring(0, 50)}...
+        // 缓存反转后的报告，渲染只传索引，避免把对象 JSON 拼进 onclick 属性（XSS 注入点）
+        reportsCache = reports.slice().reverse();
+        container.innerHTML = reportsCache.map((r, idx) => {
+            const riskClass = escapeAttr(String(r.risk_level || 'unknown').toLowerCase());
+            const summary = escapeHtml(String(r.summary || '').substring(0, 50));
+            return `
+            <div class="report-item ${riskClass}">
+                <div class="item-time">${escapeHtml(new Date(r.created_at).toLocaleString())}</div>
+                <div class="item-text" onclick="showReportDetails(${idx})" style="cursor: pointer;">
+                    <strong>${escapeHtml(r.risk_level)} Risk</strong>: ${summary}...
                 </div>
                 <div class="download-buttons" style="margin-top: 5px; display: flex; gap: 5px;">
                     <button class="btn-download" onclick="event.stopPropagation(); downloadReport(${r.id}, 'markdown')" title="下载 Markdown">
@@ -530,7 +554,8 @@ async function loadReports() {
                     </button>
                 </div>
             </div>
-        `).join('');
+            `;
+        }).join('');
     } catch (e) { console.error(e); }
 }
 
@@ -543,9 +568,9 @@ function showReportModal(report) {
     content.innerHTML = `
         <div style="margin-bottom: 20px;">
             <span style="background: ${getRiskColor(report.risk_level)}; padding: 5px 10px; border-radius: 4px; font-weight: bold; color: #fff;">
-                ${report.risk_level} Risk Level
+                ${escapeHtml(report.risk_level)} Risk Level
             </span>
-            <span style="margin-left: 10px; color: var(--text-muted);">${report.summary}</span>
+            <span style="margin-left: 10px; color: var(--text-muted);">${escapeHtml(report.summary)}</span>
         </div>
         <div class="markdown-body" style="color: #e0f2fe;">
             ${formatMarkdown(report.content)}
@@ -554,13 +579,18 @@ function showReportModal(report) {
     modal.style.display = 'block';
 }
 
-function showReportDetails(report) { showReportModal(report); }
+// 从缓存按索引展示报告详情，避免把对象 JSON 拼进 onclick 属性
+function showReportDetails(idx) {
+    const report = reportsCache[idx];
+    if (!report) return;
+    showReportModal(report);
+}
 
 closeBtn.onclick = () => modal.style.display = 'none';
 window.onclick = (e) => { if (e.target == modal) modal.style.display = 'none'; }
 
 function getRiskColor(level) {
-    switch (level.toLowerCase()) {
+    switch (String(level || '').toLowerCase()) {
         case 'high': return '#ff0055';
         case 'medium': return '#ffbf00';
         case 'low': return '#00ff9d';
@@ -569,7 +599,9 @@ function getRiskColor(level) {
 }
 
 function formatMarkdown(text) {
-    return text
+    // 先转义 HTML 防止 LLM 输出中的标签执行，再做 markdown 语法替换
+    // （markdown 的 * # 不属于 HTML 特殊字符，转义后仍可被正则匹配）
+    return escapeHtml(text)
         .replace(/\n/g, '<br>')
         .replace(/### (.*)/g, '<h3 style="color:var(--primary); margin:15px 0;">$1</h3>')
         .replace(/## (.*)/g, '<h2 style="color:var(--primary); margin:20px 0;">$1</h2>')

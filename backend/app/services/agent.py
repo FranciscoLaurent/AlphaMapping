@@ -56,7 +56,7 @@ class AgentService:
             query = response.choices[0].message.content.strip()
             # Remove any potential markdown formatting
             query = query.replace("`", "").replace("json", "").strip()
-            print(f"cseql is {query}")
+            logger.debug("Generated CSEQL: %s", query)
             return query
             
         except Exception as e:

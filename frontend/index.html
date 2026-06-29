@@ -13,6 +13,8 @@
         rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <script src="https://fastly.jsdelivr.net/npm/echarts@4.9.0/map/js/world.js"></script>
+    <script src="lib/sanitize.js"></script>
+    <script src="lib/risk.js"></script>
 </head>
 
 <body>
@@ -65,9 +67,6 @@
                             <div class="stat-value" id="total-assets">0</div>
                             <div class="stat-label">资产总数</div>
                         </div>
-                        <div class="stat-trend">
-                            <i class="fas fa-arrow-up"></i> <span>12%</span>
-                        </div>
                     </div>
 
                     <div class="stat-card">
@@ -76,9 +75,6 @@
                             <div class="stat-value" id="high-risk">0</div>
                             <div class="stat-label">高危资产</div>
                         </div>
-                        <div class="stat-trend danger">
-                            <i class="fas fa-arrow-up"></i> <span>5%</span>
-                        </div>
                     </div>
 
                     <div class="stat-card">
@@ -86,9 +82,6 @@
                         <div class="stat-content">
                             <div class="stat-value" id="query-count">0</div>
                             <div class="stat-label">查询次数</div>
-                        </div>
-                        <div class="stat-trend">
-                            <i class="fas fa-arrow-up"></i> <span>8%</span>
                         </div>
                     </div>
 
